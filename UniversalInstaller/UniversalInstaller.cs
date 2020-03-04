@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -72,7 +72,7 @@ namespace FOG
                   v => uninstall = v != null },
                 { "upgrade",  "upgrade an existing installation",
                   v => upgrade = v != null },
-                { "l|log",  "the log file to use",
+                { "l=|log=",  "the log file to use",
                   v => logFile = v },
                 { "?|help",  "show this message and exit",
                   v => help = v != null },
@@ -87,19 +87,19 @@ namespace FOG
             }
 
             // Defaults
-            if (server == null)
+            if (server == null && !upgrade)
                 server = DEFAULT_SERVER;
-            if (webRoot == null)
+            if (webRoot == null && !upgrade)
                 webRoot = DEFAULT_WEBROOT;
 
             // If no server was set, show help
-            if (string.IsNullOrWhiteSpace(server))
+            if (string.IsNullOrWhiteSpace(server) && !upgrade)
             {
                 ShowHelp(p);
                 return;
             }
             // A blank webroot is equal to /
-            if (string.IsNullOrWhiteSpace(webRoot))
+            if (string.IsNullOrWhiteSpace(webRoot) && !upgrade)
             {
                 webRoot = DEFAULT_WEBROOT;
             }
@@ -108,6 +108,7 @@ namespace FOG
             {
                 LogPath = logFile;
                 Log.FilePath = LogPath;
+                Log.Output = Log.Mode.File;
             }
 
             if (args.Length == 1)
@@ -128,7 +129,7 @@ namespace FOG
             else if (uninstall)
                 PerformCLIUninstall();
             else if (upgrade)
-                PerformUpgrade();
+                PerformUpgrade(https ? "1" : "", tray ? "1" : "", server, webRoot, rootLog ? "1" : "");
             else if (args.Length == 0)
                 InteractiveMode();
             else
@@ -186,14 +187,30 @@ namespace FOG
 
         }
 
-        private static void PerformUpgrade()
+        private static void PerformUpgrade(string https, string tray, string server, string webRoot, string rootLog)
         {
             Log.Output = Log.Mode.File;
             var settingsFile = Path.Combine(Settings.Location, "settings.json");
             Settings.SetPath(settingsFile);
+            if (string.IsNullOrEmpty(https)) https = Settings.Get("HTTPS");
+            if (string.IsNullOrEmpty(tray)) tray = Settings.Get("Tray");
+            if (string.IsNullOrEmpty(server)) server = Settings.Get("Server");
+            if (string.IsNullOrEmpty(webRoot)) webRoot = Settings.Get("WebRoot");
+            if (string.IsNullOrEmpty(rootLog)) rootLog = Settings.Get("RootLog");
+            var lastInstallDir = Path.GetDirectoryName(Settings.Location);
 
-            Install(Settings.Get("HTTPS"), Settings.Get("Tray"), Settings.Get("Server"), 
-                Settings.Get("WebRoot"), Settings.Get("Company"), Settings.Get("RootLog"));
+            if (!Install(https, tray, server, webRoot, Settings.Get("Company"), rootLog, false, lastInstallDir))
+            {
+                var installLog = File.ReadAllLines(Log.FilePath);
+                Log.FilePath = Path.Combine(Settings.Location, "fog.log");
+                if (Settings.Get("RootLog").Equals("1") && Settings.OS == Settings.OSType.Windows)
+                    Log.FilePath = @"C:\fog.log";
+                foreach (var line in installLog)
+                {
+                    Log.Entry(LogName, line);
+                }
+                Environment.Exit(1);
+            }
 
             File.Copy(settingsFile, 
                 Path.Combine(Helper.Instance.GetLocation(), "settings.json"), true);
@@ -379,7 +396,7 @@ namespace FOG
         {
             Log.Header("License");
             Log.NewLine();
-            Log.WriteLine("FOG Service Copyright (C) 2014-2017 FOG Project", _infoColor);
+            Log.WriteLine("FOG Service Copyright (C) 2014-2020 FOG Project", _infoColor);
             Log.WriteLine("This program comes with ABSOLUTELY NO WARRANTY.", _infoColor);
             Log.WriteLine("This is free software, and you are welcome to redistribute it under certain", _infoColor);
             Log.WriteLine("conditions. See your FOG server under 'FOG Configuration' -> 'License' for", _infoColor);
@@ -401,7 +418,7 @@ namespace FOG
         }
 
         private static bool Install(string https, string tray, string server, 
-            string webRoot, string company, string rootLog, bool skipSave= false)
+            string webRoot, string company, string rootLog, bool skipSave= false, string location = null)
         {
             Log.NewLine();
             Log.Header("Installing");
@@ -409,7 +426,7 @@ namespace FOG
 
             if (!DoAction("Getting things ready", Helper.Instance.PrepareFiles))
                 return false;
-            if (!DoAction("Installing files",() => Helper.Instance.Install(https, tray, server, webRoot, company, rootLog)))
+            if (!DoAction("Installing files",() => Helper.Instance.Install(https, tray, server, webRoot, company, rootLog, location)))
                     return false;
 
             if (Settings.OS == Settings.OSType.Windows)
@@ -435,7 +452,6 @@ namespace FOG
         private static bool DoAction(string action, Func<bool> method )
         {
             Log.Action(action);
-            Log.Output = Log.Mode.File;
             var success = false;
 
             try
@@ -448,7 +464,6 @@ namespace FOG
                 Log.Error(LogName, ex);
             }
 
-            Log.Output = Log.Mode.Console;
             Log.ActionResult(success);
 
             return success;
@@ -458,11 +473,9 @@ namespace FOG
         {
             Log.Action("Starting FOG Service");
 
-            Log.Output = Log.Mode.File;
             var controlPath = Path.Combine(Helper.Instance.GetLocation(), "control.sh");
 
             var returnCode = ProcessHandler.Run("/bin/bash", controlPath + " start");
-            Log.Output = Log.Mode.Console;
             Log.ActionResult(returnCode == 0);
             Log.NewLine();
         }

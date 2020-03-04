@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,16 +24,20 @@ using Microsoft.Deployment.WindowsInstaller;
 using Microsoft.Win32.TaskScheduler;
 using FOG;
 using Microsoft.Win32;
+using Zazzles;
 
 namespace SetupHelper
 {
     public class CustomActions
     {
+        private const string LogName = "Installer";
+
         private static void DisplayMSIError(Session session, string msg)
         {
             var r = new Record();
             r.SetString(0, msg);
             session.Message(InstallMessage.Error, r);
+            Log.Error(LogName, msg);
         }
 
         [CustomAction]
@@ -41,7 +45,7 @@ namespace SetupHelper
         {
             try
             {
-                if (GenericSetup.PinServerCert(session.CustomActionData["sHTTPS"],
+                if (GenericSetup.PinServerCert((session.CustomActionData["sHTTPS"].Equals("1")) ? "1" : "0",
                     session.CustomActionData["sWEBADDRESS"], 
                     session.CustomActionData["sWEBROOT"], 
                     session.CustomActionData["sINSTALLDIR"]))
@@ -66,8 +70,8 @@ namespace SetupHelper
         {
             try
             {
-
-                GenericSetup.SaveSettings(session.CustomActionData["sHTTPS"], session.CustomActionData["sUSETRAY"], 
+                var sHttps = session.CustomActionData["sHTTPS"];
+                GenericSetup.SaveSettings((sHttps.Equals("1")) ? "1" : "0", session.CustomActionData["sUSETRAY"],
                     session.CustomActionData["sWEBADDRESS"], session.CustomActionData["sWEBROOT"], "FOG",
                     session.CustomActionData["sROOTLOG"], session.CustomActionData["sProductVersion"], session.CustomActionData["sINSTALLDIR"]);
 

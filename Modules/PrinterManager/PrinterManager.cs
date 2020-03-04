@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -41,6 +41,7 @@ namespace FOG.Modules.PrinterManager
         {
             Compatiblity = Settings.OSType.Windows;
             Name = "PrinterManager";
+            ShutdownFriendly = false;
             LogName = Name;
             _configuredPrinters = new List<string>();
 

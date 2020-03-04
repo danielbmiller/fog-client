@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2015 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -52,7 +52,7 @@ namespace FOG
             return process.ExitCode == 0;
         }
 
-        public bool Install(string https, string tray, string server, string webRoot, string company, string rootLog)
+        public bool Install(string https, string tray, string server, string webRoot, string company, string rootLog, string location)
         {
             var process = new Process
             {
@@ -64,6 +64,7 @@ namespace FOG
                         $"USETRAY=\"{tray}\" " +
                         $"WEBROOT=\"{webRoot}\" " +
                         $"ROOTLOG=\"{rootLog}\" " +
+                        (string.IsNullOrEmpty(location) ? "" : $"INSTALLDIR=\"{location}\" ") +
                         $"WEBADDRESS=\"{server}\" " +
                         $"HTTPS=\"{https}\""
                 }

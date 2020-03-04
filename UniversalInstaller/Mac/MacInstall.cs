@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -79,7 +79,7 @@ namespace FOG
             return true;
         }
 
-        public bool Install(string https, string tray, string server, string webRoot, string company, string rootLog)
+        public bool Install(string https, string tray, string server, string webRoot, string company, string rootLog, string location)
         {
             return Install();
         }

@@ -12,6 +12,7 @@ param(
 	[string]$plink   = "$PSScriptRoot\BuildTools\plink.exe",
 	[string]$pscp    = "$PSScriptRoot\BuildTools\pscp.exe",
 	[string]$signer  = "$PSScriptRoot\BuildTools\SignCode.cmd",
+	[string]$signerSec = "$PSScriptRoot\BuildTools\SignCodeSec.cmd",
 	[string]$sshKey  = "$PSScriptRoot\BuildTools\auth.ppk",
 	[string]$netPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
 )
@@ -44,6 +45,7 @@ $msiConfig       = "$PSScriptRoot\MSI\MSI.wixproj $buildMode"
 $trayConfig      = "$PSScriptRoot\Tray\Tray.csproj"
 $toSign          = "Zazzles.dll", "Modules.dll", "FOGService.exe", "FOGShutdownGUI.exe", "FOGUpdateHelper.exe", "FOGUpdateWaiter.exe", "FOGUserService.exe", "FOGTray.exe"
 $signExec        = "cmd.exe /c ""$signer"" ""$PSScriptRoot\"
+$signSecExec     = "cmd.exe /c ""$signerSec"" ""$PSScriptRoot\"
 
 $plinkConfig     = "-i ""$sshKey"" $user@$server mkdir $path" + "$channel" + "/" + "$name"
 $pscpConfig      = "-i ""$sshKey"" -r $PSScriptRoot\out\* $user" + "@" + "$server" + ":" + "$path$channel" + "/" + "$name"
@@ -63,16 +65,26 @@ $toZip = "EngineIoClientDotNet.dll", "FOGService.exe", "FOGService.exe.config", 
 			"FOGUpdateHelper.exe.config", "FOGUpdateWaiter.exe", "FOGUpdateWaiter.exe.config", `
 			"FOGUserService.exe", "FOGUserService.exe.config", "log4net.dll", "logo.ico", `
 			"MetroFramework.dll", "MetroFramework.Fonts.dll", `
-			"Modules.dll", "Modules.dll.config", "Newtonsoft.Json.dll", `
-			"ProcessPrivileges.dll", "SuperSocket.Common.dll", "SuperSocket.SocketBase.dll", `
+			"Modules.dll", "Modules.dll.config", "Newtonsoft.Json.dll", "ProcessPrivileges.dll", `
+			"SuperSocket.ClientEngine.dll", "SuperSocket.Common.dll", "SuperSocket.SocketBase.dll", `
 			"SuperSocket.SocketEngine.dll", "SuperWebSocket.dll", "themes.xml", `
 			"WebSocket4Net.dll", "Zazzles.dll", "Quartz.dll", "Common.Logging.dll", `
-			"Common.Logging.Core.dll", "ICSharpCode.SharpZipLib.dll", "de", "fr", "nl", "no", "eu", "es", "hu", "pt", "cs"
+			"Common.Logging.Core.dll", "ICSharpCode.SharpZipLib.dll", "de", "fr", "nl", "no", "eu", "es", "hu", "pt", "cs", "ro", "pl"
+
 ##################################################
 # Initial Build
 ##################################################
 Write-Host "Restoring Packages"
 Invoke-Expression ($nuget + "restore") | out-null
+
+Write-Host "Cleaning Projects"
+Invoke-Expression ($msbuild + $solutionConfig + " /t:Clean")
+Invoke-Expression ($msbuild + $installerConfig + " /t:Clean")
+Invoke-Expression ($msbuild + $msiConfig + " /t:Clean")
+If (Test-Path "$PSScriptRoot\bin"){ Remove-Item -Recurse "$PSScriptRoot\bin" | out-null }
+If (Test-Path "$PSScriptRoot\bin"){ Remove-Item -Recurse "$PSScriptRoot\bin" | out-null }
+If (Test-Path "$PSScriptRoot\bin"){ Remove-Item -Recurse "$PSScriptRoot\bin" | out-null }
+New-Item -ItemType directory -Path "$PSScriptRoot\bin" | out-null
 
 Write-Host "Building Solution"
 Invoke-Expression ($msbuild + $solutionConfig) | out-null
@@ -84,10 +96,23 @@ Copy-Item "$PSScriptRoot\themes.xml" "$PSScriptRoot\bin\themes.xml"
 # Build Installers
 ##################################################
 if ($sign) {
-	Write-Host "Signing Binaries"
+	$currDate = Get-Date
+	$signDate = $currDate.AddDays(-550)
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$signDate'`"";
+	}
+	Write-Host "Signing Binaries with time $signDate"
 	foreach ($file in $toSign) {
 		Write-Host "--> $file"
 		Invoke-Expression($signExec + "bin\$file""") | out-null
+	}
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$currDate'`"";
+	}
+	Write-Host "Signing Binaries with time $currDate"
+	foreach ($file in $toSign) {
+		Write-Host "--> $file"
+		Invoke-Expression($signSecExec + "bin\$file""") | out-null
 	}
 }
 
@@ -103,15 +128,26 @@ foreach ($file in $toZip) {
 Zip "$PSScriptRoot\bin\tmp" $InstallerZip | out-null
 
 If (Test-Path "$PSScriptRoot\out"){ Remove-Item -Recurse "$PSScriptRoot\out" | out-null }
+If (Test-Path "$PSScriptRoot\out"){ Remove-Item -Recurse "$PSScriptRoot\out" | out-null }
+If (Test-Path "$PSScriptRoot\out"){ Remove-Item -Recurse "$PSScriptRoot\out" | out-null }
 New-Item -ItemType directory -Path "$PSScriptRoot\out" | out-null
 
 Write-Host "Building MSI"
 Invoke-Expression ($msbuild + $msiConfig) | out-null
 $InstallerMSI = "$PSScriptRoot\UniversalInstaller\Scripts\FOGService.msi"
 if ($sign) {
-	Write-Host "Signing MSI"
+	$currDate = Get-Date
+	$signDate = $currDate.AddDays(-550)
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$signDate'`"";
+	}
+	Write-Host "Signing MSI with time $signDate"
 	Invoke-Expression($signExec + "bin\FOGService.msi""") | out-null
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$currDate'`"";
+	}
 }
+
 if (Test-Path $InstallerMSI) { Remove-Item $InstallerMSI }
 Copy-Item "$PSScriptRoot\bin\FOGService.msi" $InstallerMSI
 Copy-Item "$PSScriptRoot\bin\FOGService.msi" "$PSScriptRoot\out\FOGService.msi"
@@ -119,13 +155,22 @@ Copy-Item "$PSScriptRoot\bin\FOGService.msi" "$PSScriptRoot\out\FOGService.msi"
 Write-Host "Building Smart Installer"
 Invoke-Expression ($msbuild + $installerConfig) | out-null
 
-
 Write-Host "ILMerging Smart Installer"
 Invoke-Expression ($ilMerge + $smartInstallerMerge )
 
 if ($sign) {
-	Write-Host "Signing Smart Installer"
+	$currDate = Get-Date
+	$signDate = $currDate.AddDays(-550)
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$signDate'`"";
+	}
+	Write-Host "Signing Smart Installer with time $signDate"
 	Invoke-Expression($signExec + "out\SmartInstaller.exe""") | out-null
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$currDate'`"";
+	}
+	Write-Host "Signing Smart Installer with time $currDate"
+	Invoke-Expression($signSecExec + "out\SmartInstaller.exe""") | out-null
 }
 
 ##################################################
@@ -135,8 +180,18 @@ Write-Host "ILMerging Debugger"
 Invoke-Expression ($ilMerge + $debuggerMerge)
 
 if ($sign) {
-	Write-Host "Signing Debugger"
+	$currDate = Get-Date
+	$signDate = $currDate.AddDays(-550)
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$signDate'`"";
+	}
+	Write-Host "Signing Debugger with time $signDate"
 	Invoke-Expression($signExec + "out\Debugger.exe""") | out-null
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$currDate'`"";
+	}
+	Write-Host "Signing Debugger with time $currDate"
+	Invoke-Expression($signSecExec + "out\Debugger.exe""") | out-null
 }
 
 ##################################################
@@ -146,8 +201,18 @@ Write-Host "ILMerging PrinterManagerHelper"
 Invoke-Expression ($ilMerge + $printerMerge)
 
 if ($sign) {
-	Write-Host "Signing PrinterManager Helper"
+	$currDate = Get-Date
+	$signDate = $currDate.AddDays(-550)
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$signDate'`"";
+	}
+	Write-Host "Signing PrinterManager Helper with time $signDate"
 	Invoke-Expression($signExec + "out\PrinterManagerHelper.exe""") | out-null
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+		Start-Process powershell -Verb RunAs -Wait "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Date -Date '$currDate'`"";
+	}
+	Write-Host "Signing PrinterManager Helper with time $currDate"
+	Invoke-Expression($signSecExec + "out\PrinterManagerHelper.exe""") | out-null
 }
 
 

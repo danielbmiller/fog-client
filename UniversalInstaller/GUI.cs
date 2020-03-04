@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -128,7 +128,7 @@ namespace FOG
                     case InstallSection.Install:
                         success = Helper.Instance.Install("0", "0", 
                             addressTxtBox.Text, webRootTxtBox.Text, "FOG",
-                            (logSwitch.Checked) ? "1" : "0");
+                            (logSwitch.Checked) ? "1" : "0", null);
                         break;
                     case InstallSection.Configure:
                         success = Configure();

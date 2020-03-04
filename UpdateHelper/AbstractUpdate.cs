@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2017 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,6 +18,8 @@
  */
 
 
+using System;
+using System.IO;
 using Zazzles;
 using Zazzles.Modules.Updater;
 
@@ -25,9 +27,24 @@ namespace FOG
 {
     abstract class AbstractUpdate :  IUpdate
     {
-        public void ApplyUpdate()
+        private static readonly string LogName = "UpdateHelper";
+
+        public int ApplyUpdate()
         {
-            ProcessHandler.RunClientEXE("SmartInstaller.exe", $"/upgrade /log=\"{Log.FilePath}\"");
+            var temp = Environment.GetEnvironmentVariable("TEMP", EnvironmentVariableTarget.Machine);
+            if (string.IsNullOrEmpty(temp))
+                temp = Path.GetTempPath();
+            if (!string.IsNullOrEmpty(temp) && !Directory.Exists(temp))
+                Directory.CreateDirectory(temp);
+            var logFilePath = Path.Combine(temp, "FOGService.install.log");
+
+            var ret = ProcessHandler.RunClientEXE("SmartInstaller.exe", $"/upgrade /log=\"{logFilePath}\"");
+            if (ret != 0)
+            {
+                Log.Error(LogName, "Failed to apply update, SmartInstaller returned exit code " + ret);
+                Log.Error(LogName, "Check log file " + logFilePath);
+            }
+            return ret;
         }
 
         public abstract void StartService();

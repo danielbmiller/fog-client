@@ -1,6 +1,6 @@
 ﻿/*
  * FOG Service : A computer management client for the FOG Project
- * Copyright (C) 2014-2015 FOG Project
+ * Copyright (C) 2014-2020 FOG Project
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -62,11 +62,19 @@ namespace FOG
 
                 var downloaded = Communication.DownloadFile("/management/other/ca.cert.der", keyPath);
                 if (!downloaded)
+                {
+                    Log.Entry(LogName, "Could not download server CA cert from FOG server");
                     return false;
+                }
 
                 cert = new X509Certificate2(keyPath);
 
-                return RSA.InjectCA(cert);
+                var status = RSA.InjectCA(cert);
+                if (status)
+                    Log.Entry(LogName, "Successfully pinned server CA cert to " + cert.Subject);
+                else
+                    Log.Error(LogName, "Could not pin server CA to " + cert.Subject);
+                return status;
             }
             catch (Exception ex)
             {
@@ -93,6 +101,7 @@ namespace FOG
                     { "RootLog", rootLog}
                 };
                 File.WriteAllText(filePath, settings.ToString());
+                Log.Entry(LogName, "Settings successfully saved in " + filePath);
                 return true;
             }
             catch (Exception ex)
@@ -114,11 +123,12 @@ namespace FOG
                 store.Open(OpenFlags.ReadWrite);
                 store.Remove(cert);
                 store.Close();
+                Log.Entry(LogName, "FOG server CA cert successfully unpinned");
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Error(LogName, "Could unpin server CA cert");
+                Log.Error(LogName, "Could not unpin FOG server CA cert");
                 Log.Error(LogName, ex);
                 throw;
             }
@@ -131,7 +141,7 @@ namespace FOG
                 var cert = new X509Certificate2(location);
                 var store = new X509Store(StoreName.Root, GetCertStoreLocation());
                 store.Open(OpenFlags.ReadWrite);
-                var cers = store.Certificates.Find(X509FindType.FindBySubjectName, "FOG Project", true);
+                var cers = store.Certificates.Find(X509FindType.FindBySubjectName, "FOG Project CA", true);
 
                 var validKeyPresent = false;
                 if (cers.Count > 0)
@@ -152,11 +162,12 @@ namespace FOG
                 }
                 store.Close();
 
+                Log.Entry(LogName, "FOG Project CA successfully installed");
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Error(LogName, "Unable to install FOG CA cert");
+                Log.Error(LogName, "Unable to install FOG Project CA cert");
                 Log.Error(LogName, ex);
                 throw;
             }
@@ -170,7 +181,7 @@ namespace FOG
                 X509Certificate2 CAroot = null;
                 var store = new X509Store(StoreName.Root, GetCertStoreLocation());
                 store.Open(OpenFlags.ReadOnly);
-                var cers = store.Certificates.Find(X509FindType.FindBySubjectName, "FOG Project", true);
+                var cers = store.Certificates.Find(X509FindType.FindBySubjectName, "FOG Project CA", true);
 
                 if (cers.Count > 0)
                 {
@@ -195,6 +206,7 @@ namespace FOG
                 store.Open(OpenFlags.ReadWrite);
                 store.Remove(cert);
                 store.Close();
+                Log.Entry(LogName, "FOG Project CA cert successfully uninstalled");
             }
             catch (Exception ex)
             {
